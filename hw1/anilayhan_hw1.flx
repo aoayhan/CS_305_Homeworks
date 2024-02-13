@@ -1,0 +1,140 @@
+%{
+ int noLines =1;
+ int nestedComments = 0;
+%}
+
+tMAIL "Mail"
+tENDMAIL "end Mail"
+tSEND "send"
+tFROM "from"
+tSCHEDULE "schedule"
+tENDSCHEDULE "end schedule"
+tTO "to"
+tSET "set"
+tCOMMA ","
+tLPR "("
+tLBR "["
+tAT "@"
+tCOLON ":"
+tRPR ")"
+tRBR "]"
+tDATE ([0-9]{2}\/[0-9]{2}\/[0-9]{4}|[0-9]{2}-[0-9]{2}-[0-9]{4}|[0-9]{2}\.[0-9]{2}\.[0-9]{4})
+tSTRING \"([^\"]*|\"\")\"
+tIDENT [A-Za-z_][A-Za-z0-9_]*
+tADDRESS [A-Za-z0-9][A-Za-z0-9_-]*@[A-Za-z0-9]+([.-]?[A-Za-z0-9]+)*(\.[A-Za-z0-9]+)+
+
+
+
+tTIME [0-9]{1,2}:[0-9]{1,2} 
+
+
+
+%{ 
+void printToken(const char *token) { 
+    printf("%s\n", token);
+}
+%}
+
+%%
+\n          noLines++;
+
+
+{tSEND}     printf("%d_tSEND\n",noLines);
+{tFROM}     printf("%d_tFROM\n",noLines);   
+{tSCHEDULE} printf("%d_tSCHEDULE\n",noLines);
+{tTO}       printf("%d_tTO\n",noLines);
+{tSET}      printf("%d_tSET\n",noLines);
+{tCOMMA}    printf("%d_tCOMMA\n",noLines);
+{tLPR}      printf("%d_tLPR\n",noLines);
+{tLBR}      printf("%d_tLBR\n",noLines);
+{tAT}       printf("%d_tAT\n",noLines);
+{tCOLON}    printf("%d_tCOLON\n",noLines);
+{tRBR}      printf("%d_tRBR\n",noLines);
+{tRPR}      printf("%d_tRPR\n",noLines);
+{tTIME} {
+    int hour,minute;
+    sscanf(yytext, "%d:%d", &hour, &minute);
+    printf("%d_tTIME_(Hour_%02d_Minute_%02d)\n", noLines, hour, minute);
+}
+
+
+("end"[ \t\n]+)?"schedule" { printf("%d_tENDSCHEDULE\n",noLines); }
+
+{tSTRING} {
+    char *tSTR = yytext + 1; 
+    tSTR[yyleng - 2] = '\0';
+    printf("%d_tSTRING_(%s)\n", noLines, tSTR);
+    int i;
+    for (i = 0; i < yyleng; i++) {
+        if (yytext[i] == '\n') {
+            noLines++;
+        }
+    }
+}
+{tMAIL} printf("%d_tMAIL\n",noLines);
+{tIDENT} {
+    if (yytext[0] != '"' && yytext[yyleng - 1] != '"') {
+        printf("%d_tIDENT_(%s)\n", noLines,yytext);
+    }
+}
+{tDATE} {
+    int day, month, year;
+    sscanf(yytext, "%d%*[-/.]%d%*[-/.]%d", &day, &month, &year);
+    printf("%d_tDATE_(Day_%02d_Month_%02d_Year_%04d)\n", noLines, day, month, year);
+}
+{tENDMAIL} printf("%d_tENDMAIL\n",noLines); 
+{tADDRESS} printf("%d_tADDRESS_(%s)\n",noLines, yytext);
+"/*" {
+    nestedComments++;
+    while (1) {
+        char c = input();
+        if (c == EOF) {
+            nestedComments = 0;
+            break;
+        } else if (c == '*' && input() == '/') {
+            nestedComments--;
+            if (nestedComments == 0) {
+                break;
+            }
+        } else if (c == '/' && input() == '*') {
+            nestedComments++;
+        }
+        else if (c == '\n') {
+            noLines++;
+        }
+    }
+}
+"//" {
+    if (nestedComments == 0) {
+        while (1) {
+            char c = input();
+            if ( c == '\n') {
+                unput(c);
+                break;
+            }
+            else if (c == EOF) {
+                return 0;
+            }
+        }
+    } else {
+        while (1) {
+            char c = input();
+            if ( c == '\n') {
+                unput(c);
+                break;
+            }
+            else if (c == EOF) {
+                return 0;
+            }
+        }
+    }
+}
+[ \t]+
+
+. {printf("%d_ILLEGAL_CHARACTER_(%s)\n",noLines, yytext);}
+%%
+
+int main() {
+yylex (); 
+return (0);
+}
